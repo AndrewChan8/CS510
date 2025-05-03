@@ -6,7 +6,7 @@ from gensim.models import Word2Vec
 
 from gensim.models import KeyedVectors
 
-# Load the Google News pre-trained model (300 dimensions)
+# Google News pre-trained model
 print("Loading Google News Word2Vec model...")
 google_model = KeyedVectors.load_word2vec_format("GoogleNews-vectors-negative300.bin", binary=True)
 print("Model loaded.")
@@ -27,13 +27,13 @@ for word, score in words2_google:
 # Load Brown corpus as list of sentences
 sentences = brown.sents()
 
-# Train Word2Vec (CBOW model, 100 dimensions, window=5, min word count=2)
+# Train Word2Vec with CBOW model, 100 dimensions, window=5, and min word count=2
 model_brown = Word2Vec(sentences, vector_size=100, window=5, min_count=2, sg=0)
 
-# Save the model (optional)
+# Save the model
 model_brown.save("brown_word2vec.model")
 
-# Function to check word existence and get most similar words
+# Check word existence and get most similar words
 def get_similar_words(word):
   if word in model_brown.wv.key_to_index:
     return model_brown.wv.most_similar(word, topn=10)
