@@ -3,7 +3,7 @@ import math
 import sys
 from collections import defaultdict
 
-UNKNOWN_PENALTY = -100.0  # Fallback log prob for unknowns
+UNKNOWN_PENALTY = -5.0 # Fallback log prob for unknowns
 
 # Load the trained pickle model
 def load_model(model_file="hmm_model.pkl"):
@@ -38,11 +38,11 @@ def write_output_file(sentences, tags, output_file):
 
 def get_emission_logprob(emission_probs, tag, word, known_words):
   if word in emission_probs.get(tag, {}):
-    return emission_probs[tag][word] # Known emission
+    return emission_probs[tag][word] # Known word, but not emitted by this tag
   elif word in known_words:
-    return math.log(1e-10)  # Known word, but not emitted by this tag
+    return math.log(1e-10) # Known word, but not emitted by this tag
   else:
-    # Unknown word handling: heuristics rules
+    # Unknown word heuristics
     if word.istitle():
       if tag == "NNP": return -1.0
     elif word.isdigit():
@@ -55,7 +55,20 @@ def get_emission_logprob(emission_probs, tag, word, known_words):
       if tag == "RB": return -1.0
     elif word.endswith("ion"):
       if tag == "NN": return -1.0
-    return UNKNOWN_PENALTY # Default penalty for unknowns
+    elif word.endswith("s") and not word.istitle():
+      if tag == "NNS": return -1.0
+    elif word.endswith("est"):
+      if tag == "JJS": return -1.0
+    elif word.endswith("er"):
+      if tag in ("JJR", "NN"): return -1.0
+    elif "-" in word:
+      if tag in ("JJ", "NN"): return -1.0
+    elif word.startswith("$") or word.endswith("%"):
+      if tag == "CD": return -1.0
+
+    if tag in ("NN", "VB", "JJ"):
+      return -3.0  # Gentle boost to common tags
+    return UNKNOWN_PENALTY  # Fallback for others
 
 def viterbi(sentence, model):
   tags = model["tags"]
@@ -64,17 +77,18 @@ def viterbi(sentence, model):
   transition_probs = model["transition_probs"]
   start_probs = model["start_probs"]
 
+  # V[t][tag] stores the max log-prob of a path ending in tag at time
   V = [{} for _ in range(len(sentence))]
   backpointer = [{} for _ in range(len(sentence))]
 
-  # Initialization
+  # Init first word
   for tag in tags:
     trans = start_probs.get(tag, math.log(1e-10))
     emiss = get_emission_logprob(emission_probs, tag, sentence[0], known_words)
     V[0][tag] = trans + emiss
     backpointer[0][tag] = None
 
-  # Dynamic programming
+  # Recursion
   for t in range(1, len(sentence)):
     word = sentence[t]
     for curr_tag in tags:
@@ -111,7 +125,7 @@ def decode(input_file="POS_dev.words", output_file="dev_output.pos", model_file=
     predicted_tags.append(tag_seq)
 
   write_output_file(sentences, predicted_tags, output_file)
-  print(f"✅ Decoding complete! Output saved to {output_file}")
+  print(f"Finished decoding. Output stored in {output_file}")
 
 if __name__ == "__main__":
   import sys
