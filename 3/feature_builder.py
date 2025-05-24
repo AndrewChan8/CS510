@@ -1,4 +1,26 @@
 import sys
+import re
+
+# Load the gazetteers
+with open("LargestCity.txt") as f:
+  city_list = set(line.strip().lower() for line in f if line.strip())
+
+with open("dist.all.last.txt") as f:
+  name_list = set(line.strip().lower() for line in f if line.strip())
+
+
+def word_shape(word):
+  shape = ""
+  for c in word:
+    if c.isupper():
+      shape += "X"
+    elif c.islower():
+      shape += "x"
+    elif c.isdigit():
+      shape += "d"
+    else:
+      shape += c
+  return shape
 
 def extract_features(tokens, pos_tags, chunk_tags, prev_tags=None, is_training=True):
   features_per_token = []
@@ -7,12 +29,35 @@ def extract_features(tokens, pos_tags, chunk_tags, prev_tags=None, is_training=T
     features = []
     word = tokens[i]
 
-    # Basic features
+    # Gazetteer features
+    if word.lower() in city_list:
+      features.append("in_city_list")
+    if word.lower() in name_list:
+      features.append("in_name_list")
+
+    # Basic
     features.append(f"word={word}")
     features.append(f"pos={pos_tags[i]}")
     features.append(f"chunk={chunk_tags[i]}")
 
-    # Contextual features
+    # Capitalization + digit
+    if word.isupper():
+      features.append("isupper")
+    if word.istitle():
+      features.append("istitle")
+    if word.isdigit():
+      features.append("isdigit")
+
+    # Prefix/suffix
+    if len(word) >= 2:
+      features.append(f"suffix2={word[-2:]}")
+    if len(word) >= 3:
+      features.append(f"suffix3={word[-3:]}")
+
+    # Word shape
+    features.append(f"shape={word_shape(word)}")
+
+    # Context
     if i > 0:
       features.append(f"prev_word={tokens[i - 1]}")
       features.append(f"prev_pos={pos_tags[i - 1]}")
